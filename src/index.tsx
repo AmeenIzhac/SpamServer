@@ -1,39 +1,12 @@
-const express = require("express");
-const fs = require("fs");
-const cors = require("cors");
+import express from "express";
+import fs from "fs";
+import cors from "cors";
+import { Report } from "./types.tsx";
+
 const PORT = 4000;
-
-interface ReportsData {
-  size: number;
-  nextOffset: String;
-  elements: Report[];
-}
-
-interface Report {
-  id: string;
-  source: string;
-  sourceIdentityId: string;
-  reference: Reference;
-  state: string;
-  payload: Payload;
-  created: string;
-}
-
-interface Reference {
-  referenceId: string;
-  referenceType: string;
-}
-
-interface Payload {
-  source: string;
-  reportType: string;
-  message: string | null;
-  reportId: string;
-  referenceResourceId: string;
-  referenceResourceType: string;
-}
-
+const REPORTS_FILE_PATH: string = "./data/reports.json";
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -41,32 +14,40 @@ app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
 
+// handle request to block or revoke a report of given id
 app.put("/reports/:id", (req, res) => {
-  const reportId = req.params.id;
-  console.log(req);
-  res.end();
+  const reportId: string = req.params.id;
+  const newState: string = req.body.ticketState;
+  const data: string = fs.readFileSync(REPORTS_FILE_PATH, "utf8");
+  const reportsJSON = JSON.parse(data);
+  const allReports = reportsJSON["elements"];
+  const resolvedReport = allReports.find((report) => report.id === reportId);
+  resolvedReport.state = newState;
+  fs.writeFileSync(REPORTS_FILE_PATH, JSON.stringify(reportsJSON));
+  res.status(200).end();
 });
 
+// handle request to get all open reports
 app.get("/reports", (_, res) => {
-  fs.readFile("./data/reports.json", "utf8", (err, data) => {
+  fs.readFile(REPORTS_FILE_PATH, "utf8", (err, data) => {
     if (err) {
       console.log(err);
+      res.status(500).end();
       return;
     }
-
     try {
-      const reportsData = JSON.parse(data);
-      const reports = reportsData["elements"];
+      const reportsJSON = JSON.parse(data);
+      const allReports: Report[] = reportsJSON["elements"];
       const openReports: Report[] = [];
-      for (let i = 0; i < reports.length; i++) {
-        if (reports[i].state === "OPEN") {
-          openReports.push(reports[i]);
+      allReports.forEach((report) => {
+        if (report.state === "OPEN" || report.state === "REVOKED") {
+          openReports.push(report);
         }
-      }
-      console.log(openReports);
-      res.json(JSON.parse(data));
+      });
+      res.status(200).json(openReports);
     } catch (err) {
       console.log(err);
+      res.status(500).end();
       return;
     }
   });
