@@ -2,7 +2,7 @@
 
 A server hosting reports of spam for a social media platform.
 
-Made using Node and TypeScript
+Made using Node and TypeScript.
 
 Install dependencies with `npm i`
 
